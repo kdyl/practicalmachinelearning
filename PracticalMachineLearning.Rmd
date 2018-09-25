@@ -1,0 +1,80 @@
+---
+title: "Machine Learning Assignment"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+
+The analysis is performed on data from Jawbone Up, Nike FuelBand, and Fitbit, devices which quantifies self movement. The aim of the analysis was to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants, to predict whether they correctly or incorrectly perform barbell lifts.
+
+
+
+Data was downloaded as training and tests sets and loaded into R. 
+
+``` {r results = "hide"}
+# downloading
+fileUrl1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+download.file(url=fileUrl1, destfile = 'training.csv', method = "curl")
+fileUrl2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+download.file(url=fileUrl2, destfile = 'testing.csv', method = "curl")
+
+# loading into R
+training <- read.csv("training.csv")
+testing <- read.csv("testing.csv")
+```
+
+## Cross validation
+
+Training data set was splitted into training and test sets for cross validation. Method used for splitting was K-fold with k=10. 
+
+``` {r results="hide"}
+library(caret)
+folds <- createFolds(y=training$classe, k=10, list = TRUE, returnTrain = FALSE) 
+train <- training[-folds[[2]],]
+valid <- training[folds[[2]],]
+```
+
+## Preprocessing
+
+Only variables measuring accelometers were used, which were variables having "accel" in their name. Variables which consisted of only NA values were also removed from further analysis.
+Property damage for every event type was calculated and summed based on grouped event types.
+
+```{r results="hide"}
+# subsetting only accelaration variables
+train <- train[,c(grep("accel",names(train)),dim(train)[[2]])]
+valid <- valid[,c(grep("accel",names(valid)),dim(valid)[[2]])]
+
+# removing columns with NA values
+na <- is.numeric(0)
+for (i in 1:dim(train)[2]){
+  na[i] <- sum(is.na(train[,i]))
+}
+idx <- which(na > 0)
+train <- train[,-idx]
+valid <- valid[,-idx]
+```
+
+
+## Modelling via Gradient Boosting Machine (GBM)
+
+After trying several training method on different trainining/validation sets, the method which caused the highest accuracy was chosen, which was Gradient Boosting Machine.
+```{r, results="hide"}
+modFit <- train(classe ~., data = train, method = "gbm")
+```
+
+Model was applied to validation set and confusion matrix was calculated.
+
+``` {r, results="asis"}
+pred <- predict(modFit, valid)
+confusionMatrix(pred, valid$classe)
+```
+
+Model was applied to predict values from testing set.
+
+``` {r, results="asis"}
+pred_test <- predict(modFit, testing)
+pred_test
+```
